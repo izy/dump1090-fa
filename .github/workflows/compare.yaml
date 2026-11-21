@@ -1,0 +1,71 @@
+name: Check DSP code and decoded output on ARM and x86
+
+# Runs on GitHub's x86 and ARM64 machines, plus a 32-bit ARM (armhf, as on
+# Raspberry Pi OS) build under emulation:
+#   - validates every DSP flavor available on the machine (including NEON on
+#     ARM) with odd buffer lengths;
+#   - runs the unit/regression tests and the fuzz regression inputs;
+#   - builds master and this commit, replays the same synthetic traffic
+#     through both, and fails if any decoded output differs by a single byte;
+#   - times both builds on the same input (informational; shared runners are
+#     noisy, so treat small differences with suspicion).
+
+on: [ push, pull_request, workflow_dispatch ]
+
+jobs:
+  native:
+    name: Native (${{ matrix.image }})
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - ubuntu-24.04
+          - ubuntu-24.04-arm
+    runs-on: ${{ matrix.image }}
+    steps:
+      - name: Check out repository (with history, to build master too)
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: true
+      - name: Install prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential pkg-config libncurses-dev python3-numpy clang libclang-rt-18-dev
+      - name: Validate DSP flavors (odd lengths, NaN checks)
+        run: |
+          make -j$(nproc) RTLSDR=no BLADERF=no HACKRF=no LIMESDR=no SOAPYSDR=no starch-benchmark
+          ./starch-benchmark -V
+      - name: Unit and regression tests
+        run: make -j$(nproc) RTLSDR=no BLADERF=no HACKRF=no LIMESDR=no SOAPYSDR=no test
+      - name: Fuzz regression inputs (ASan + UBSan)
+        run: fuzz/run-regressions.sh
+      - name: Compare decoded output with master, and time both
+        run: tools/compare-builds.sh --base origin/master --timing 7 --workdir "$RUNNER_TEMP/compare"
+
+  armhf:
+    name: 32-bit ARM (armhf, emulated)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository (with history, to build master too)
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: true
+      - name: Set up ARM emulation
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm
+      - name: Build, validate and compare in a Debian armhf container
+        run: |
+          docker run --rm --platform linux/arm/v7 -v "$PWD":/src -w /src debian:bookworm bash -c '
+            set -e
+            apt-get update -qq
+            apt-get install -y -qq --no-install-recommends build-essential pkg-config libncurses-dev python3 python3-numpy git ca-certificates >/dev/null
+            git config --global --add safe.directory /src
+            uname -m
+            make -j$(nproc) RTLSDR=no BLADERF=no HACKRF=no LIMESDR=no SOAPYSDR=no starch-benchmark
+            ./starch-benchmark -V
+            make -j$(nproc) RTLSDR=no BLADERF=no HACKRF=no LIMESDR=no SOAPYSDR=no test
+            tools/compare-builds.sh --base origin/master --small --workdir /tmp/compare
+          '
