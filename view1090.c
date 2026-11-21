@@ -58,6 +58,7 @@ static void view1090InitConfig(void) {
     // Now initialise things that should not be 0/NULL to their defaults
     Modes.check_crc               = 1;
     Modes.fix_df                  = 1;
+    Modes.net_accept_position     = 1; // we connect out to a configured Beast source
     Modes.interactive_display_ttl = MODES_INTERACTIVE_DISPLAY_TTL;
     Modes.interactive             = 1;
     Modes.maxRange                = 1852 * 300; // 300NM default max range
