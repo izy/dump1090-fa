@@ -1,13 +1,15 @@
 name: Build test packages
 
-# Installable .deb packages of this branch for a live trial, for Debian
-# bookworm and trixie (and the Raspberry Pi OS releases based on them) on
-# arm64, armhf and amd64. Each package is installed in a fresh container and
-# used to decode some synthetic traffic before it is uploaded.
+# Installable .deb packages of this branch for a live trial, for bookworm and
+# trixie:
+#   - Debian arm64, armhf and amd64 (arm64 also suits 64-bit Raspberry Pi OS);
+#   - Raspbian armhf, built for ARMv6 like 32-bit Raspberry Pi OS itself, so
+#     it runs on every Pi including the Pi Zero and Pi 1 (and still uses NEON
+#     where the CPU has it).
+# Each package is installed and used to decode some synthetic traffic before
+# it is uploaded; the Raspbian ones on an emulated Pi Zero CPU.
 #
-# Download them from the run's "Artifacts" section on GitHub. The armhf
-# packages need an ARMv7 CPU or newer (Pi 2 and later); see
-# tools/build-test-package.sh for a Pi Zero or Pi 1.
+# Download them from the run's "Artifacts" section on GitHub.
 
 on: [ push, workflow_dispatch ]
 
@@ -66,5 +68,56 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dump1090-fa-${{ matrix.dist }}-${{ matrix.arch }}
+          path: out/*.deb
+          retention-days: 30
+
+  raspbian:
+    name: raspbian ${{ matrix.dist }} armhf (any 32-bit Pi, including Pi Zero / Pi 1)
+    strategy:
+      fail-fast: false
+      matrix:
+        dist: [ bookworm, trixie ]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Set up ARM emulation
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm
+      - name: Create a Raspbian (32-bit Raspberry Pi OS) root filesystem
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends debootstrap
+          sudo tools/raspbian-rootfs.sh ${{ matrix.dist }} /tmp/rootfs
+          sudo cp -a "$PWD" /tmp/rootfs/src
+      - name: Build the package
+        run: |
+          sudo chroot /tmp/rootfs env GITHUB_RUN_NUMBER="$GITHUB_RUN_NUMBER" \
+            DEBEMAIL="${{ github.actor }}@users.noreply.github.com" HOME=/root bash -c '
+              set -e
+              git config --global --add safe.directory "*"
+              cd /src
+              tools/build-test-package.sh --dist ${{ matrix.dist }} --install-deps --out /src/out
+            '
+          mkdir -p out
+          sudo cp /tmp/rootfs/src/out/dump1090-fa_*.deb out/
+      - name: Install it and decode some traffic on an emulated Pi Zero CPU (ARMv6, no NEON)
+        run: |
+          sudo chroot /tmp/rootfs env QEMU_CPU=arm1176 HOME=/root bash -c '
+            set -e
+            echo "CPU: $(uname -m)"
+            apt-get install -y -qq --no-install-recommends /src/out/dump1090-fa_*.deb >/dev/null
+            dump1090-fa --version | grep -m1 "dump1090-fa "
+            cd /src
+            python3 tools/gen-traffic.py --aircraft 20 --seconds 2 --seed 1 --iq /tmp/t.iq 2>/dev/null
+            n=$(dump1090-fa --device-type ifile --ifile /tmp/t.iq --iformat UC8 --raw 2>/dev/null | wc -l || true)
+            echo "decoded $n messages"
+            [ "$n" -gt 100 ]
+          '
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: dump1090-fa-raspbian-${{ matrix.dist }}-armhf
           path: out/*.deb
           retention-days: 30

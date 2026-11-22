@@ -69,26 +69,33 @@ Only do this once step 1 has passed.
 Find which package your Pi needs:
 
 ```bash
-dpkg --print-architecture; . /etc/os-release; echo $VERSION_CODENAME
+dpkg --print-architecture; . /etc/os-release; echo $ID $VERSION_CODENAME
 ```
 
-This prints, for example, `arm64` and `bookworm`.
+This prints, for example, `armhf` and `raspbian bookworm`. The packages are
+under "Artifacts" on the latest successful run of
+[Build test packages](https://github.com/izy/dump1090-fa/actions/workflows/packages.yaml)
+(you need to be signed in to GitHub). Unzip the one you need and copy the
+`.deb` file to the Pi.
 
-- **`arm64`, `armhf` or `amd64`, with `bookworm` or `trixie`:** download the
-  matching `dump1090-fa-<release>-<architecture>` package. It is under
-  "Artifacts" on the latest successful run of
-  [Build test packages](https://github.com/izy/dump1090-fa/actions/workflows/packages.yaml)
-  (you need to be signed in to GitHub). Unzip it and copy the `.deb` file to
-  the Pi.
-- **Pi Zero or Pi 1:** these have an ARMv6 CPU, which the downloadable
-  `armhf` packages can't run on. Build the package on the Pi itself instead.
-  It is slow, but it works:
+- **`armhf` and `raspbian`** (32-bit Raspberry Pi OS, including PiAware SD
+  card images): use `dump1090-fa-raspbian-<release>-armhf`. It is built the
+  same way as Raspberry Pi OS itself, so it runs on every Pi, including the
+  Pi Zero and Pi 1.
+- **`arm64`** (64-bit Raspberry Pi OS or Debian): use
+  `dump1090-fa-<release>-arm64`.
+- **`armhf` and `debian`, or `amd64`** (Debian on other boards or PCs): use
+  `dump1090-fa-<release>-armhf` or `dump1090-fa-<release>-amd64`. The Debian
+  `armhf` package needs a Pi 2 or newer.
 
-  ```bash
-  cd ~/dump1090-test && tools/build-test-package.sh --install-deps
-  ```
+If none of these fits, build the package on the machine itself. It is slow on
+older Pis, but it works:
 
-  The package ends up in `~/dump1090-test/test-packages/`.
+```bash
+cd ~/dump1090-test && tools/build-test-package.sh --install-deps
+```
+
+The package ends up in `~/dump1090-test/test-packages/`.
 
 ### Install it
 

@@ -16,10 +16,11 @@
 # next official release (11.2), which replaces it as usual. dump1090-fa
 # --version, the logs and the stats all show the test version.
 #
-# GitHub Actions builds these for bookworm and trixie on arm64, armhf and
-# amd64 (.github/workflows/packages.yaml). The armhf packages need an ARMv7
-# or newer CPU (Pi 2 and later); on a Pi Zero or Pi 1 (ARMv6), build the
-# package on the Pi itself with this script (slow, but it works).
+# GitHub Actions builds these for bookworm and trixie (.github/workflows/
+# packages.yaml): Debian arm64, armhf and amd64, and Raspbian armhf, which is
+# built for ARMv6 like 32-bit Raspberry Pi OS and so runs on every Pi
+# including the Pi Zero and Pi 1. Elsewhere, run this script on the target
+# machine itself.
 #
 # Builds the committed state of HEAD (uncommitted changes are not included).
 
