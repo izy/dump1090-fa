@@ -88,8 +88,9 @@ if [ $INSTALL_DEPS = 1 ]; then
     $SUDO apt-get build-dep -y ./
 fi
 
-dpkg-buildpackage -b --no-sign -j"$(nproc)"
-cp "$TMP"/*.deb "$OUT"/
+# no separate debug-symbols package: testers only need the one .deb
+DEB_BUILD_OPTIONS="${DEB_BUILD_OPTIONS:-} noautodbgsym" dpkg-buildpackage -b --no-sign -j"$(nproc)"
+cp "$TMP"/dump1090-fa_*.deb "$OUT"/
 echo
 echo "Built:"
-ls -1 "$TMP"/*.deb | xargs -n1 basename | sed "s|^|  $OUT/|"
+ls -1 "$TMP"/dump1090-fa_*.deb | xargs -n1 basename | sed "s|^|  $OUT/|"

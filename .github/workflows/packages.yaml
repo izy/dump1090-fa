@@ -56,7 +56,7 @@ jobs:
             set -e
             apt-get update -qq
             apt-get install -y -qq --no-install-recommends ./out/dump1090-fa_*.deb python3-numpy >/dev/null
-            dump1090-fa --version | head -1
+            dump1090-fa --version | grep -m1 "dump1090-fa "
             python3 tools/gen-traffic.py --aircraft 20 --seconds 2 --seed 1 --iq /tmp/t.iq 2>/dev/null
             n=$(dump1090-fa --device-type ifile --ifile /tmp/t.iq --iformat UC8 --raw 2>/dev/null | wc -l || true)
             echo "decoded $n messages"
