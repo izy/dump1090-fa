@@ -1,0 +1,70 @@
+name: Build test packages
+
+# Installable .deb packages of this branch for a live trial, for Debian
+# bookworm and trixie (and the Raspberry Pi OS releases based on them) on
+# arm64, armhf and amd64. Each package is installed in a fresh container and
+# used to decode some synthetic traffic before it is uploaded.
+#
+# Download them from the run's "Artifacts" section on GitHub. The armhf
+# packages need an ARMv7 CPU or newer (Pi 2 and later); see
+# tools/build-test-package.sh for a Pi Zero or Pi 1.
+
+on: [ push, workflow_dispatch ]
+
+jobs:
+  package:
+    name: ${{ matrix.dist }} ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        dist: [ bookworm, trixie ]
+        arch: [ arm64, armhf, amd64 ]
+        include:
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            platform: linux/arm64
+          - arch: armhf
+            runner: ubuntu-24.04
+            platform: linux/arm/v7
+            qemu: true
+          - arch: amd64
+            runner: ubuntu-24.04
+            platform: linux/amd64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Set up ARM emulation
+        if: matrix.qemu
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm
+      - name: Build the package
+        run: |
+          docker run --rm --platform ${{ matrix.platform }} -v "$PWD":/src -w /src \
+            -e GITHUB_RUN_NUMBER -e DEBEMAIL="${{ github.actor }}@users.noreply.github.com" \
+            debian:${{ matrix.dist }} bash -c '
+              set -e
+              git config --global --add safe.directory /src
+              apt-get update -qq
+              apt-get install -y -qq --no-install-recommends git ca-certificates >/dev/null
+              tools/build-test-package.sh --dist ${{ matrix.dist }} --install-deps --out /src/out
+            '
+      - name: Install it in a fresh container and decode some traffic
+        run: |
+          docker run --rm --platform ${{ matrix.platform }} -v "$PWD":/src -w /src debian:${{ matrix.dist }} bash -c '
+            set -e
+            apt-get update -qq
+            apt-get install -y -qq --no-install-recommends ./out/dump1090-fa_*.deb python3-numpy >/dev/null
+            dump1090-fa --version | head -1
+            python3 tools/gen-traffic.py --aircraft 20 --seconds 2 --seed 1 --iq /tmp/t.iq 2>/dev/null
+            n=$(dump1090-fa --device-type ifile --ifile /tmp/t.iq --iformat UC8 --raw 2>/dev/null | wc -l || true)
+            echo "decoded $n messages"
+            [ "$n" -gt 100 ]
+          '
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: dump1090-fa-${{ matrix.dist }}-${{ matrix.arch }}
+          path: out/*.deb
+          retention-days: 30

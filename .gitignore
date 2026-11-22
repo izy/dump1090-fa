@@ -27,3 +27,4 @@ regressiontests
 fuzz/out
 fuzz/out-regress
 fuzz/replay
+test-packages/
