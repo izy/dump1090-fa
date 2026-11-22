@@ -139,8 +139,11 @@ variation from traffic and weather.
   ps -o etime,time,rss -C dump1090-fa
   ```
 
-- **Memory:** the `rss` column above should stay roughly steady over days. It
-  should not keep climbing.
+- **Memory:** the `rss` column above (in KB) grows for about the first hour
+  after a restart, while the web map's one-hour history fills, and should then
+  stay roughly steady over days. With about 700 aircraft it levelled off at
+  about 35 MB in testing, the same as the official build. It should not keep
+  climbing after the first hour.
 - **Restarts and errors:**
 
   ```bash
