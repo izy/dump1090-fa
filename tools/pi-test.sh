@@ -140,8 +140,10 @@ for period in ("last1min", "latest", "total"):
         [ -n "$GAIN" ] && say "using RECEIVER_GAIN from $defaults: $GAIN dB"
     fi
     [ -n "$GAIN" ] || GAIN=40
-    # rtl_sdr picks the nearest supported gain; the R820T maximum is 49.6 dB
-    GAIN=$(python3 -c 'import sys; print(min(float(sys.argv[1]), 49.6))' "$GAIN")
+    # rtl_sdr picks the nearest supported gain; the R820T maximum is 49.6 dB.
+    # A negative gain means the tuner's automatic gain, which rtl_sdr calls 0.
+    GAIN=$(python3 -c 'import sys; g = float(sys.argv[1]); print(0 if g < 0 else min(g, 49.6))' "$GAIN") || die "bad gain '$GAIN'"
+    [ "$GAIN" = 0 ] && say "recording with the tuner's automatic gain"
     if [ -z "$DEVICE" ] && [ -r "$defaults" ]; then
         DEVICE=$(. "$defaults" 2>/dev/null; echo "${RECEIVER_SERIAL:-}")
     fi
