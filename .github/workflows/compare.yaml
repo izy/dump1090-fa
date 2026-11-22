@@ -1,7 +1,8 @@
 name: Check DSP code and decoded output on ARM and x86
 
-# Runs on GitHub's x86 and ARM64 machines, plus a 32-bit ARM (armhf, as on
-# Raspberry Pi OS) build under emulation:
+# Runs on GitHub's x86 and ARM64 machines, plus two 32-bit ARM builds under
+# emulation: Debian armhf, and Raspbian (32-bit Raspberry Pi OS, ARMv6) on an
+# emulated Pi Zero / Pi 1 CPU without NEON, which runs the fallback DSP code:
 #   - validates every DSP flavor available on the machine (including NEON on
 #     ARM) with odd buffer lengths;
 #   - runs the unit/regression tests and the fuzz regression inputs;
@@ -64,6 +65,40 @@ jobs:
             apt-get install -y -qq --no-install-recommends build-essential pkg-config libncurses-dev python3 python3-numpy git ca-certificates >/dev/null
             git config --global --add safe.directory /src
             uname -m
+            make -j$(nproc) RTLSDR=no BLADERF=no HACKRF=no LIMESDR=no SOAPYSDR=no starch-benchmark
+            ./starch-benchmark -V
+            make -j$(nproc) RTLSDR=no BLADERF=no HACKRF=no LIMESDR=no SOAPYSDR=no test
+            tools/compare-builds.sh --base origin/master --small --workdir /tmp/compare
+          '
+
+  armv6:
+    name: ARMv6 (Pi Zero / Pi 1, Raspbian, emulated)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository (with history, to build master too)
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: true
+      - name: Set up ARM emulation
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm
+      - name: Create a Raspbian (32-bit Raspberry Pi OS) root filesystem
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends debootstrap
+          sudo tools/raspbian-rootfs.sh bookworm /tmp/rootfs
+          sudo cp -a "$PWD" /tmp/rootfs/src
+      - name: Build, validate and compare on an emulated ARM1176 CPU (no NEON)
+        run: |
+          sudo chroot /tmp/rootfs env QEMU_CPU=arm1176 HOME=/root bash -c '
+            set -e
+            echo "CPU: $(uname -m)"
+            grep -m1 -i "^features" /proc/cpuinfo || true
+            git config --global --add safe.directory /src
+            git config --global --add safe.directory "*"
+            cd /src
             make -j$(nproc) RTLSDR=no BLADERF=no HACKRF=no LIMESDR=no SOAPYSDR=no starch-benchmark
             ./starch-benchmark -V
             make -j$(nproc) RTLSDR=no BLADERF=no HACKRF=no LIMESDR=no SOAPYSDR=no test
