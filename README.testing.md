@@ -146,6 +146,15 @@ variation from traffic and weather.
 
 - **PiAware and mlat** (if you use them): `piaware-status` should still show
   dump1090 connected and mlat working.
+- **Other programs reading dump1090's output** (for example Virtual Radar
+  Server, or anything on ports 30002, 30003 or 30005): they should stay
+  connected. dump1090 disconnects any client whose 64 KB network buffer
+  fills, and both the official build and this one can do that when data
+  arrives in bursts, for example over a patchy network link. This build
+  processes a burst faster, so it can fill that buffer slightly more easily.
+  If a client keeps getting disconnected, add `--net-buffer 2` (256 KB) to
+  `EXTRA_OPTIONS` in `/etc/default/dump1090-fa`. In testing, that stopped
+  the disconnects for both builds.
 
 ### Going back to the official version
 
