@@ -28,3 +28,4 @@ fuzz/out
 fuzz/out-regress
 fuzz/replay
 test-packages/
+__pycache__/
