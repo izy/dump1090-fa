@@ -45,9 +45,9 @@ jobs:
             -e GITHUB_RUN_NUMBER -e DEBEMAIL="${{ github.actor }}@users.noreply.github.com" \
             debian:${{ matrix.dist }} bash -c '
               set -e
-              git config --global --add safe.directory /src
               apt-get update -qq
               apt-get install -y -qq --no-install-recommends git ca-certificates >/dev/null
+              git config --global --add safe.directory /src
               tools/build-test-package.sh --dist ${{ matrix.dist }} --install-deps --out /src/out
             '
       - name: Install it in a fresh container and decode some traffic
