@@ -336,6 +336,9 @@ struct aircraft *trackUpdateFromMessage(struct modesMessage *mm);
 /* Remove and free every tracked aircraft */
 void trackRemoveAllAircraft();
 
+/* Return the k-th smallest (0-based) of v[0..n), n > 0, reordering v */
+uint64_t selectKth(uint64_t *v, unsigned n, unsigned k);
+
 /* Call periodically */
 void trackPeriodicUpdate();
 

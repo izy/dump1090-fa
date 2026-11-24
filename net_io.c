@@ -1928,7 +1928,8 @@ static const char *hazard_enum_string(hazard_t hazard)
     }
 }
 
-char *generateAircraftJson(const char *url_path, int *len) {
+// aircraft.json, or (max_aircraft != 0) a snapshot for the web map's history
+static char *aircraftJson(int *len, unsigned max_aircraft) {
     uint64_t now = mstime();
     struct aircraft *a;
     int buflen = 32768; // The initial buffer is resized as needed
@@ -1936,9 +1937,44 @@ char *generateAircraftJson(const char *url_path, int *len) {
     char *line_start;
     int first = 1;
 
-    MODES_NOTUSED(url_path);
-
     _messageNow = now;
+
+    // The history keeps HISTORY_SIZE snapshots for an hour, both here and as
+    // files that are usually on a RAM-backed filesystem, so a flood of
+    // spoofed addresses would multiply the aircraft table's size by that.
+    // A snapshot therefore keeps at most max_aircraft aircraft: those with
+    // the most messages, which against a flood of addresses that each send
+    // a few messages are the aircraft actually being received. This bounds
+    // the number of aircraft, not bytes: an attacker who keeps max_aircraft
+    // addresses fully populated can still make each snapshot larger. Below
+    // the limit (all real traffic), nothing is left out.
+    bool limit = false;
+    long min_messages = 0;
+    unsigned ties = 0, included = 0;
+    if (max_aircraft) {
+        unsigned n = 0;
+        for (a = Modes.aircrafts; a; a = a->next)
+            if (a->reliable)
+                ++n;
+        if (n > max_aircraft) {
+            limit = true;
+            uint64_t *counts = malloc(n * sizeof(*counts));
+            if (counts) {
+                unsigned i = 0, above = 0;
+                for (a = Modes.aircrafts; a; a = a->next)
+                    if (a->reliable)
+                        counts[i++] = (uint64_t) a->messages;
+                // the max_aircraft-th largest message count
+                min_messages = (long) selectKth(counts, n, n - max_aircraft);
+                free(counts);
+                for (a = Modes.aircrafts; a; a = a->next)
+                    if (a->reliable && a->messages > min_messages)
+                        ++above;
+                ties = max_aircraft - above;
+            }
+            // (if the allocation failed, the first max_aircraft are kept)
+        }
+    }
 
     p = safe_snprintf(p, end,
                        "{ \"now\" : %.1f,\n"
@@ -1950,6 +1986,19 @@ char *generateAircraftJson(const char *url_path, int *len) {
     for (a = Modes.aircrafts; a; a = a->next) {
         if (!a->reliable) {
             continue;
+        }
+
+        if (limit) {
+            if (included >= max_aircraft)
+                break;
+            if (a->messages < min_messages)
+                continue;
+            if (a->messages == min_messages) {
+                if (!ties)
+                    continue;
+                --ties;
+            }
+            ++included;
         }
 
         if (first)
@@ -2072,6 +2121,15 @@ char *generateAircraftJson(const char *url_path, int *len) {
     p = SAFE_APPEND_LITERAL(p, end, "\n  ]\n}\n");
     *len = p-buf;
     return buf;
+}
+
+char *generateAircraftJson(const char *url_path, int *len) {
+    MODES_NOTUSED(url_path);
+    return aircraftJson(len, 0);
+}
+
+char *generateHistorySnapshotJson(int *len) {
+    return aircraftJson(len, HISTORY_MAX_AIRCRAFT);
 }
 
 static char * appendStatsJson(char *p,

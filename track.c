@@ -224,7 +224,7 @@ void trackRemoveAllAircraft()
 }
 
 // Return the k-th smallest (0-based) of v[0..n), reordering v (quickselect)
-static uint64_t selectKth(uint64_t *v, unsigned n, unsigned k)
+uint64_t selectKth(uint64_t *v, unsigned n, unsigned k)
 {
     unsigned lo = 0, hi = n - 1;
     while (lo < hi) {

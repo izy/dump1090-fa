@@ -258,6 +258,93 @@ static void test_target_heading_range(void)
     CHECK(result >= 0 && mm.metype == 29 && !mm.nav.heading_valid, "ES target state: heading of 511 degrees is ignored");
 }
 
+static unsigned json_aircraft_count(const char *json)
+{
+    unsigned n = 0;
+    for (const char *p = json; (p = strstr(p, "{\"hex\":\"")) != NULL; ++p)
+        ++n;
+    return n;
+}
+
+static bool json_has_aircraft(const char *json, uint32_t addr)
+{
+    char needle[32];
+    snprintf(needle, sizeof(needle), "{\"hex\":\"%06x\"", addr);
+    return strstr(json, needle) != NULL;
+}
+
+// The sequence of addresses in an aircraft.json document
+static void json_aircraft_list(const char *json, char *out, size_t outlen)
+{
+    size_t used = 0;
+    out[0] = 0;
+    for (const char *p = json; (p = strstr(p, "{\"hex\":\"")) != NULL; ++p) {
+        if (used + 8 >= outlen)
+            break;
+        memcpy(out + used, p + 8, 6);
+        used += 6;
+        out[used++] = ',';
+        out[used] = 0;
+    }
+}
+
+// The web map's history keeps HISTORY_SIZE snapshots of aircraft.json for an
+// hour. A flood of spoofed addresses must not fill every snapshot with the
+// whole aircraft table: a snapshot keeps at most HISTORY_MAX_AIRCRAFT, and
+// those must be the aircraft actually being received. Below the limit a
+// snapshot lists the same aircraft as aircraft.json.
+static void test_history_snapshot_cap(void)
+{
+    struct modesMessage mm;
+    uint64_t now = mstime();
+    const unsigned real = 300, flood = HISTORY_MAX_AIRCRAFT + 1000;
+    int len;
+
+    trackRemoveAllAircraft();
+    for (unsigned i = 0; i < real; ++i) {
+        for (unsigned m = 0; m < 20; ++m) {
+            fake_df17(&mm, 0x700000 + i, now);
+            trackUpdateFromMessage(&mm);
+        }
+    }
+
+    char *hist = generateHistorySnapshotJson(&len);
+    char *live = generateAircraftJson("/data/aircraft.json", &len);
+    static char hist_list[8 * 20000], live_list[8 * 20000];
+    json_aircraft_list(hist, hist_list, sizeof(hist_list));
+    json_aircraft_list(live, live_list, sizeof(live_list));
+    CHECK(json_aircraft_count(hist) == real && !strcmp(hist_list, live_list),
+          "history snapshot: below the limit it lists the same %u aircraft as aircraft.json, in the same order", real);
+    free(hist);
+    free(live);
+
+    // a flood: each spoofed address sends just enough to become reliable
+    for (unsigned i = 0; i < flood; ++i) {
+        for (unsigned m = 0; m < TRACK_RELIABLE_DF17_MESSAGES; ++m) {
+            fake_df17(&mm, 0x900000 + i, now);
+            trackUpdateFromMessage(&mm);
+        }
+    }
+
+    hist = generateHistorySnapshotJson(&len);
+    live = generateAircraftJson("/data/aircraft.json", &len);
+    unsigned kept = json_aircraft_count(hist), missing = 0;
+    for (unsigned i = 0; i < real; ++i)
+        if (!json_has_aircraft(hist, 0x700000 + i))
+            ++missing;
+    CHECK(kept == HISTORY_MAX_AIRCRAFT, "history snapshot: %u of %u aircraft kept during a flood (limit %u)",
+          kept, real + flood, (unsigned) HISTORY_MAX_AIRCRAFT);
+    CHECK(missing == 0, "history snapshot: every aircraft with many messages is kept over flood addresses (%u missing)", missing);
+    size_t hlen = strlen(hist);
+    CHECK(hlen > 4 && !strcmp(hist + hlen - 4, "]\n}\n") && !strstr(hist, "[,") && !strstr(hist, ",,") && !strstr(hist, ",\n  ]"),
+          "history snapshot: a capped snapshot is still complete JSON");
+    CHECK(json_aircraft_count(live) == real + flood, "history snapshot: aircraft.json itself still lists all %u aircraft (%u)",
+          real + flood, json_aircraft_count(live));
+    free(hist);
+    free(live);
+    trackRemoveAllAircraft();
+}
+
 int main(void)
 {
     memset(&Modes, 0, sizeof(Modes));
@@ -275,6 +362,7 @@ int main(void)
     test_faup_command_missing_value();
     test_radarcape_position();
     test_target_heading_range();
+    test_history_snapshot_cap();
 
     if (failures) {
         fprintf(stderr, "%d regression test(s) FAILED\n", failures);

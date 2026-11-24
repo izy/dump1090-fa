@@ -272,6 +272,7 @@ typedef enum {
 
 #define HISTORY_SIZE 120
 #define HISTORY_INTERVAL 30000
+#define HISTORY_MAX_AIRCRAFT 2000  // per history snapshot; see aircraftJson() in net_io.c
 
 #define MODES_NOTUSED(V) ((void) V)
 

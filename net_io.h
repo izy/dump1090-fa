@@ -95,6 +95,9 @@ char *generateAircraftJson(const char *url_path, int *len);
 char *generateStatsJson(const char *url_path, int *len);
 char *generateReceiverJson(const char *url_path, int *len);
 char *generateHistoryJson(const char *url_path, int *len);
+// aircraft.json content for a history snapshot, with at most
+// HISTORY_MAX_AIRCRAFT aircraft (the ones with the most messages)
+char *generateHistorySnapshotJson(int *len);
 void writeJsonToFile(const char *file, char * (*generator) (const char *,int*));
 
 #endif
