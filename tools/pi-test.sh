@@ -5,7 +5,8 @@
 #
 #   1. Records a short raw capture at 1090 MHz. If dump1090-fa is running, it
 #      is paused for the recording only and restarted straight afterwards.
-#   2. Builds this branch and the official code (origin/master).
+#   2. Builds this branch and FlightAware's official code (their current
+#      master, fetched from GitHub).
 #   3. Decodes the same recording with both and checks that every output is
 #      byte-for-byte identical (tools/compare-builds.sh).
 #   4. Times both on the recording, on this machine.
@@ -41,7 +42,7 @@ INSTALL_DEPS=0
 WORK=$HOME/dump1090-pi-test
 SERVICE=dump1090-fa
 
-usage() { sed -n '2,32p' "$0"; exit 2; }
+usage() { sed -n '2,30p' "$0"; exit 2; }
 while [ $# -gt 0 ]; do
     case "$1" in
         --seconds) SECONDS_TO_RECORD=$2; shift 2 ;;
@@ -84,10 +85,6 @@ fi
 
 cd "$TOP"
 git rev-parse --git-dir >/dev/null 2>&1 || die "run this from a git clone of the branch"
-if ! git rev-parse -q --verify origin/master >/dev/null; then
-    say "fetching origin/master (the official code to compare against)"
-    git fetch -q origin master:refs/remotes/origin/master || die "could not fetch origin/master"
-fi
 
 mkdir -p "$WORK" || die "cannot create $WORK"
 WORK=$(realpath "$WORK")
@@ -179,7 +176,7 @@ fi
 
 say "building both versions and comparing (this takes a while on a Pi; your feeder is $( [ $feeder_stopped = 1 ] && echo paused || echo running ))"
 # shellcheck disable=SC2086
-tools/compare-builds.sh --base origin/master --iq "$RECORDING" --timing "$ROUNDS" $SMALL --workdir "$WORK/compare" > "$WORK/compare.log" 2>&1
+tools/compare-builds.sh --base official --iq "$RECORDING" --timing "$ROUNDS" $SMALL --workdir "$WORK/compare" > "$WORK/compare.log" 2>&1
 STATUS=$?
 restart_feeder
 

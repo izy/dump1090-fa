@@ -36,7 +36,7 @@ that same recording with both the official code and this build, checks that
 the results are identical, and times both on your Pi.
 
 ```bash
-git clone -b claude/peaceful-archimedes-so5ki2 https://github.com/izy/dump1090-fa ~/dump1090-test
+git clone https://github.com/izy/dump1090-fa ~/dump1090-test
 ```
 
 ```bash

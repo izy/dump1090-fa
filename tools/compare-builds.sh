@@ -6,7 +6,8 @@
 #
 #   tools/compare-builds.sh [--base REF] [--small] [--timing ROUNDS] [--iq FILE [--iformat FMT]] [--workdir DIR]
 #
-#   --base REF        git ref to compare against (default: origin/master, else master)
+#   --base REF        git ref to compare against, or "official" (the default) for
+#                     FlightAware's current master, fetched from GitHub
 #   --small           smaller inputs (for slow or emulated machines)
 #   --timing ROUNDS   also time both builds, alternating, ROUNDS runs each
 #   --iq FILE         also compare (and time) on a real 2.4MS/s UC8 IQ recording,
@@ -39,13 +40,18 @@ while [ $# -gt 0 ]; do
         --iq) IQ_EXTRA=$(realpath "$2"); shift 2 ;;
         --iformat) IQ_FORMAT=$2; shift 2 ;;
         --workdir) WORK=$2; shift 2 ;;
-        *) sed -n '2,26p' "$0"; exit 2 ;;
+        *) sed -n '2,23p' "$0"; exit 2 ;;
     esac
 done
 
 cd "$TOP"
-if [ -z "$BASE" ]; then
-    if git rev-parse -q --verify origin/master >/dev/null; then BASE=origin/master; else BASE=master; fi
+if [ -z "$BASE" ] || [ "$BASE" = official ]; then
+    # FlightAware's own code, not this repository's master (which, on a fork,
+    # may already contain the changes being compared)
+    echo "=== fetching FlightAware's master to compare against" >&2
+    git fetch -q https://github.com/flightaware/dump1090 master:refs/remotes/flightaware/master ||
+        { echo "could not fetch FlightAware's master; use --base REF" >&2; exit 2; }
+    BASE=flightaware/master
 fi
 [ -n "$WORK" ] || WORK=$(mktemp -d)
 mkdir -p "$WORK"

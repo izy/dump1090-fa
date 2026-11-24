@@ -6,8 +6,9 @@ name: Check DSP code and decoded output on ARM and x86
 #   - validates every DSP flavor available on the machine (including NEON on
 #     ARM) with odd buffer lengths;
 #   - runs the unit/regression tests and the fuzz regression inputs;
-#   - builds master and this commit, replays the same synthetic traffic
-#     through both, and fails if any decoded output differs by a single byte;
+#   - builds FlightAware's official master and this commit, replays the same
+#     synthetic traffic through both, and fails if any decoded output differs
+#     by a single byte;
 #   - times both builds on the same input (informational; shared runners are
 #     noisy, so treat small differences with suspicion).
 
@@ -42,7 +43,7 @@ jobs:
       - name: Fuzz regression inputs (ASan + UBSan)
         run: fuzz/run-regressions.sh
       - name: Compare decoded output with master, and time both
-        run: tools/compare-builds.sh --base origin/master --timing 7 --workdir "$RUNNER_TEMP/compare"
+        run: tools/compare-builds.sh --base official --timing 7 --workdir "$RUNNER_TEMP/compare"
 
   armhf:
     name: 32-bit ARM (armhf, emulated)
@@ -68,7 +69,7 @@ jobs:
             make -j$(nproc) RTLSDR=no BLADERF=no HACKRF=no LIMESDR=no SOAPYSDR=no starch-benchmark
             ./starch-benchmark -V
             make -j$(nproc) RTLSDR=no BLADERF=no HACKRF=no LIMESDR=no SOAPYSDR=no test
-            tools/compare-builds.sh --base origin/master --small --workdir /tmp/compare
+            tools/compare-builds.sh --base official --small --workdir /tmp/compare
           '
 
   armv6:
@@ -102,5 +103,5 @@ jobs:
             make -j$(nproc) RTLSDR=no BLADERF=no HACKRF=no LIMESDR=no SOAPYSDR=no starch-benchmark
             ./starch-benchmark -V
             make -j$(nproc) RTLSDR=no BLADERF=no HACKRF=no LIMESDR=no SOAPYSDR=no test
-            tools/compare-builds.sh --base origin/master --small --workdir /tmp/compare
+            tools/compare-builds.sh --base official --small --workdir /tmp/compare
           '
