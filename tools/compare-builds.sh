@@ -129,7 +129,7 @@ log "running both builds"
 checksums "$WORK/base" "$WORK/base.sums"
 checksums "$WORK/head" "$WORK/head.sums"
 
-# Before commit e2ee4d9 ("Reset the message for each Mode A/C reply"), a Mode
+# Before the commit "Reset the message for each Mode A/C reply in a sample buffer", a Mode
 # A/C reply without a valid Mode C code showed the altitude of the previous
 # reply. Comparing against an older base on real recordings (which contain
 # Mode A/C replies) therefore differs in exactly that way: lines
