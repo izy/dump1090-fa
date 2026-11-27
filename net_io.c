@@ -1957,22 +1957,21 @@ static char *aircraftJson(int *len, unsigned max_aircraft) {
             if (a->reliable)
                 ++n;
         if (n > max_aircraft) {
+            // the aircraft table is capped, so a fixed buffer always fits
+            static uint64_t counts[TRACK_MAX_AIRCRAFT + 1];
+            unsigned i = 0, above = 0;
             limit = true;
-            uint64_t *counts = malloc(n * sizeof(*counts));
-            if (counts) {
-                unsigned i = 0, above = 0;
-                for (a = Modes.aircrafts; a; a = a->next)
-                    if (a->reliable)
-                        counts[i++] = (uint64_t) a->messages;
+            for (a = Modes.aircrafts; a && i < sizeof(counts) / sizeof(counts[0]); a = a->next)
+                if (a->reliable)
+                    counts[i++] = (uint64_t) a->messages;
+            if (i > max_aircraft) {
                 // the max_aircraft-th largest message count
-                min_messages = (long) selectKth(counts, n, n - max_aircraft);
-                free(counts);
+                min_messages = (long) selectKth(counts, i, i - max_aircraft);
                 for (a = Modes.aircrafts; a; a = a->next)
                     if (a->reliable && a->messages > min_messages)
                         ++above;
                 ties = max_aircraft - above;
             }
-            // (if the allocation failed, the first max_aircraft are kept)
         }
     }
 
@@ -2129,7 +2128,16 @@ char *generateAircraftJson(const char *url_path, int *len) {
 }
 
 char *generateHistorySnapshotJson(int *len) {
-    return aircraftJson(len, HISTORY_MAX_AIRCRAFT);
+    char *json = aircraftJson(len, HISTORY_MAX_AIRCRAFT);
+    // Snapshots are kept for an hour; give back the unused tail of the
+    // buffer (it grows by doubling, so up to half of it can be unused).
+    if (json) {
+        char *trimmed = realloc(json, *len + 1);
+        if (trimmed)
+            json = trimmed;
+        json[*len] = 0;
+    }
+    return json;
 }
 
 static char * appendStatsJson(char *p,

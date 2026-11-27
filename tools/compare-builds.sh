@@ -49,7 +49,7 @@ if [ -z "$BASE" ] || [ "$BASE" = official ]; then
     # FlightAware's own code, not this repository's master (which, on a fork,
     # may already contain the changes being compared)
     echo "=== fetching FlightAware's master to compare against" >&2
-    git fetch -q https://github.com/flightaware/dump1090 master:refs/remotes/flightaware/master ||
+    git fetch -q https://github.com/flightaware/dump1090 +master:refs/remotes/flightaware/master ||
         { echo "could not fetch FlightAware's master; use --base REF" >&2; exit 2; }
     BASE=flightaware/master
 fi

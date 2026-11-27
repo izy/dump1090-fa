@@ -327,6 +327,7 @@ static void test_history_snapshot_cap(void)
     }
 
     hist = generateHistorySnapshotJson(&len);
+    int hist_len = len;
     live = generateAircraftJson("/data/aircraft.json", &len);
     unsigned kept = json_aircraft_count(hist), missing = 0;
     for (unsigned i = 0; i < real; ++i)
@@ -336,6 +337,7 @@ static void test_history_snapshot_cap(void)
           kept, real + flood, (unsigned) HISTORY_MAX_AIRCRAFT);
     CHECK(missing == 0, "history snapshot: every aircraft with many messages is kept over flood addresses (%u missing)", missing);
     size_t hlen = strlen(hist);
+    CHECK(hlen == (size_t) hist_len, "history snapshot: stored with its exact length (%zu bytes)", hlen);
     CHECK(hlen > 4 && !strcmp(hist + hlen - 4, "]\n}\n") && !strstr(hist, "[,") && !strstr(hist, ",,") && !strstr(hist, ",\n  ]"),
           "history snapshot: a capped snapshot is still complete JSON");
     CHECK(json_aircraft_count(live) == real + flood, "history snapshot: aircraft.json itself still lists all %u aircraft (%u)",

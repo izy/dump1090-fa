@@ -236,8 +236,11 @@ void fuzz_run_outputs(void)
 
     json = generateAircraftJson("/data/aircraft.json", &len);
     fuzz_check_json("aircraft.json", json, len);
+    free(json);
 
-    // also keep a history entry, as dump1090 does
+    // also keep a (capped) history entry, as dump1090 does
+    json = generateHistorySnapshotJson(&len);
+    fuzz_check_json("history snapshot", json, len);
     int h = Modes.json_aircraft_history_next;
     free(Modes.json_aircraft_history[h].content);
     Modes.json_aircraft_history[h].content = json;
